@@ -37,6 +37,13 @@ locations, tokens or keys.
 - Claude's sandbox cannot reach github.io, api.weather.gov, IEM or CDNs. Test pages locally with
   Playwright and mocked responses; the user verifies live behavior with screenshots.
 - Claude can push to repos here but cannot create repos, change repo settings (e.g. Pages) or add secrets.
+- New repos: after the user creates one, pushes may be refused ("Claude doesn't have GitHub access") until the
+  Claude GitHub App covers it. Ask the user to check github.com/settings/installations (Claude, Configure,
+  Repository access) and, if needed, re-link via claude.ai/customize/connectors (GitHub Integration).
+  The claude.ai page's "Check repository status" box confirms access for a given repo.
+- New Pages sites: a build may not start until a commit is pushed after Pages is switched on. Push an
+  empty commit if Settings, Pages shows no "Visit site" button after a few minutes.
+- The old repo bobbyee358-dev/Nimbus now only forwards /Nimbus/ to /radar/. Do not develop there.
 - On the user's Android phone, claude.ai links open in the Claude app, which breaks GitHub re-linking.
   Fix: Android Settings, Apps, Claude, Open by default, turn off "Open supported links" during re-linking.
 

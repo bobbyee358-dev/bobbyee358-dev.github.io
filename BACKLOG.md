@@ -3,7 +3,6 @@
 ## In progress
 - Helper (Cloudflare Worker): background NWS alert notifications for the saved location.
   Waiting on: Cloudflare account, API token and account ID stored as repo secrets.
-- Point the old Nimbus address (bobbyee358-dev.github.io/Nimbus/) to /radar/ once this site is live.
 
 ## Radar ideas
 - Future radar (HRRR forecast reflectivity, available from the same IEM tile service).
@@ -20,4 +19,4 @@
 
 ## Done
 - Oct 8 2026: Nimbus Radar v1 live; fixed midnight label overlap and duplicate NWS alert cards.
-- Oct 8 2026: Hub site with launcher; radar moved to /radar/.
+- Oct 8 2026: Hub site live with launcher; radar moved to /radar/; old /Nimbus/ address forwards there.
