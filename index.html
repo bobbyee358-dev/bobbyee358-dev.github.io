@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hub</title>
+<meta name="description" content="Personal ad-free apps.">
+<meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c1319" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="hub-icon-192.png">
+<style>
+/* Layout: a short header and a single column of app tiles; wraps to two columns on wide screens. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --surface-2:#e3e8ed; --fg:#14202b; --muted:#5a6977;
+  --line:#d3dae1; --accent:#0d7f8f; --accent-fg:#ffffff;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius: 16px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0c1319; --surface:#131d26; --surface-2:#1a2733; --fg:#e3eaf0; --muted:#8a9aa8;
+    --line:#22303d; --accent:#3cc3d3; --accent-fg:#06222a;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased;
+  padding:calc(24px + env(safe-area-inset-top,0px)) 16px calc(32px + env(safe-area-inset-bottom,0px));}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header h1{margin:0;font-size:28px;font-weight:700;letter-spacing:-.02em}
+header p{margin:4px 0 0;color:var(--muted)}
+.apps{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:640px){ .apps{grid-template-columns:1fr 1fr} }
+.app{display:flex;align-items:center;gap:14px;padding:14px;border-radius:var(--radius);background:var(--surface);
+  border:1px solid var(--line);color:inherit;text-decoration:none;min-width:0}
+.app:active{transform:scale(.99)}
+.app img{width:56px;height:56px;border-radius:14px;flex:none}
+.app .txt{min-width:0;display:flex;flex-direction:column;gap:2px}
+.app b{font-size:17px}
+.app span{color:var(--muted);font-size:14px}
+.note{color:var(--muted);font-size:13px;margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Your apps</h1>
+    <p>Ad-free, built for you. Tap an app to open it.</p>
+  </header>
+  <nav class="apps" aria-label="Apps">
+    <a class="app" href="radar/">
+      <img src="radar/icon-192.png" alt="">
+      <div class="txt"><b>Nimbus Radar</b><span>Live radar, forecast and NWS alerts</span></div>
+    </a>
+  </nav>
+  <p class="note">To keep an app on your home screen, open it, then use Chrome's ⋮ menu and choose Install app or Add to home screen.</p>
+</div>
+</body>
+</html>
