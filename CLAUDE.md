@@ -25,9 +25,14 @@ locations, tokens or keys.
 - Shared look: tokens from `radar/index.html` (`--bg`, `--surface`, `--accent` ...), system font, light + dark.
 
 ## Data sources (checked Oct 2026)
-- Radar: Iowa Environmental Mesonet NEXRAD mosaic tiles
-  `https://{mesonet1|2|3}.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913[-mXXm]/{z}/{x}/{y}.png`
-  (confirmed working on the user's phone). Valid time: `/data/gis/images/4326/USCOMP/n0q_0.json`.
+- Radar default ("filtered"): NOAA MRMS Seamless Hybrid-Scan Reflectivity via IEM tiles. Latest: `q2-hsr`;
+  loop frames: `mrms::lcref-YYYYMMDDHHMI` (UTC, even minutes). MRMS dual-pol QC removes birds, insects,
+  clutter and AP. Why: the raw NEXRAD mosaic showed a metro-wide false "rain" bloom over Atlanta on a dry
+  night (user report, Oct 8 2026). Frames whose tiles all fail are skipped in the loop.
+- Radar "raw" (toggle): IEM NEXRAD mosaic `nexrad-n0q-900913[-mXXm]` (confirmed working on the phone);
+  only light clutter filtering. Valid time: `/data/gis/images/4326/USCOMP/n0q_0.json`.
+- Tile base: `https://{mesonet1|2|3}.agron.iastate.edu/cache/tile.py/1.0.0/<layer>/{z}/{x}/{y}.png`
+  (layer list: GET `/cache/tile.py/1.0.0/`, all EPSG:3857).
 - Forecast + geocoding: Open-Meteo (free for non-commercial use, attribution required).
 - Alerts + place names: api.weather.gov (works from the browser; confirmed on the phone).
 - Base map: tile.openstreetmap.org (attribution required, no offline/bulk use).

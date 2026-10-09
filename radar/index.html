@@ -65,6 +65,7 @@ a{color:var(--accent)}
 .maplabel{position:absolute;top:10px;left:12px;z-index:500;display:flex;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:none}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;
   background:color-mix(in srgb,var(--surface) 88%,transparent);border:1px solid var(--line);backdrop-filter:blur(6px)}
+.modebtn{pointer-events:auto;cursor:pointer;color:var(--fg);font-family:inherit}
 .legend{width:150px;padding:6px 8px;border-radius:10px;background:color-mix(in srgb,var(--surface) 88%,transparent);
   border:1px solid var(--line);font-size:10px;color:var(--muted)}
 .legend .ramp{height:7px;border-radius:4px;background:linear-gradient(90deg,#04e9e7,#019ff4,#0300f4,#02fd02,#01c501,#008e00,#fdf802,#e5bc00,#fd9500,#fd0000,#bc0000,#f800fd,#9854c6)}
@@ -172,7 +173,7 @@ dialog::backdrop{background:rgb(0 0 0 / .45)}
   <div class="mapwrap">
     <div id="map" role="application" aria-label="Radar map"></div>
     <div class="maplabel">
-      <span class="chip" id="radarChip">NEXRAD radar</span>
+      <button type="button" class="chip modebtn" id="radarMode" aria-pressed="true">Radar: filtered</button>
       <div class="legend" aria-label="Radar intensity scale">
         <div class="ramp"></div>
         <div class="scale"><span>Light</span><span>Heavy</span><span>Extreme</span></div>
@@ -183,7 +184,7 @@ dialog::backdrop{background:rgb(0 0 0 / .45)}
         <svg id="playIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
       </button>
       <div class="scrub">
-        <input type="range" id="scrub" min="0" max="11" value="11" step="1" aria-label="Radar frame">
+        <input type="range" id="scrub" min="0" max="9" value="9" step="1" aria-label="Radar frame">
         <div class="times num"><b id="frameTime">--</b><span id="frameAgo">Loading radar…</span></div>
       </div>
     </div>
@@ -298,10 +299,12 @@ function icon(kind, isDay = 1){
 const S = {
   map: null, marker: null, alertLayer: null,
   loc: store.get("nimbus.loc"),           // {lat, lon, name}
-  layers: [], frameTimes: [], approx: true, idx: 11, playing: false, timer: null, hold: 0,
+  frames: [], idx: 0, playing: false, timer: null, hold: 0,
+  mode: store.get("nimbus.radarMode") === "raw" ? "raw" : "clean",   // clean = NOAA MRMS (filtered), raw = NEXRAD mosaic
   lastWeather: 0, lastRadar: 0
 };
-const OFFSETS = [55,50,45,40,35,30,25,20,15,10,5,0];
+const OFFSETS = [55,50,45,40,35,30,25,20,15,10,5,0];   // raw mosaic layers, minutes old
+const CLEAN_PAST = 9, CLEAN_STEP = 6;                    // filtered: 9 archived MRMS frames, 6 min apart, plus latest
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ---------- map + radar ---------- */
@@ -315,9 +318,27 @@ async function ensureLeaflet(){
   }
   return false;
 }
-function radarUrl(off, bucket){
-  const name = off ? `nexrad-n0q-900913-m${String(off).padStart(2, "0")}m` : "nexrad-n0q-900913";
-  return `https://{s}.agron.iastate.edu/cache/tile.py/1.0.0/${name}/{z}/{x}/{y}.png?b=${bucket}`;
+const pad2 = (n) => String(n).padStart(2, "0");
+const utcStamp = (ms) => { const d = new Date(ms); return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate()) + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()); };
+const tileUrl = (name, bust) => `https://{s}.agron.iastate.edu/cache/tile.py/1.0.0/${name}/{z}/{x}/{y}.png` + (bust ? `?b=${bust}` : "");
+const RADAR_ATTR = {
+  clean: 'Radar: NOAA MRMS via <a href="https://mesonet.agron.iastate.edu/">IEM</a>',
+  raw: 'Radar: NWS NEXRAD via <a href="https://mesonet.agron.iastate.edu/">IEM</a>'
+};
+function frameDefs(){
+  const bust = Math.floor(Date.now() / 300000);
+  if (S.mode === "raw"){
+    return OFFSETS.map((off) => ({ url: tileUrl(off ? `nexrad-n0q-900913-m${pad2(off)}m` : "nexrad-n0q-900913", bust), off, latest: off === 0 }));
+  }
+  // MRMS archive frames exist every 2 minutes; ask for ones at least 6 minutes old to allow for processing delay.
+  const newest = Math.floor(Date.now() / 120000) * 120000 - 6 * 60000;
+  const defs = [];
+  for (let k = CLEAN_PAST - 1; k >= 0; k--){
+    const t = newest - k * CLEAN_STEP * 60000;
+    defs.push({ url: tileUrl("mrms::lcref-" + utcStamp(t)), time: t, approx: false });
+  }
+  defs.push({ url: tileUrl("q2-hsr", bust), latest: true });
+  return defs;
 }
 function initMap(){
   const start = S.loc ? [S.loc.lat, S.loc.lon] : [39.5, -98.35];
@@ -334,36 +355,54 @@ function initMap(){
   buildRadar();
   if (S.loc) placeMarker();
 }
+const unavailable = (f) => f.err > 0 && f.ok === 0;
 function buildRadar(){
-  const bucket = Math.floor(Date.now() / 300000);
-  if (!S.layers.length){
-    S.layers = OFFSETS.map((off, i) => L.tileLayer(radarUrl(off, bucket), {
-      pane: "radar", opacity: i === OFFSETS.length - 1 ? 0.78 : 0, subdomains: ["mesonet1","mesonet2","mesonet3"],
-      attribution: 'Radar: <a href="https://mesonet.agron.iastate.edu/">IEM</a>/NWS', updateWhenIdle: false, keepBuffer: 1
-    }).addTo(S.map));
-  } else {
-    S.layers.forEach((l, i) => l.setUrl(radarUrl(OFFSETS[i], bucket)));
-  }
+  S.frames.forEach((f) => S.map.removeLayer(f.layer));
+  S.frames = frameDefs().map((d, i) => {
+    const f = { ...d, ok: 0, err: 0 };
+    f.layer = L.tileLayer(d.url, {
+      pane: "radar", opacity: 0, subdomains: ["mesonet1","mesonet2","mesonet3"],
+      attribution: RADAR_ATTR[S.mode], updateWhenIdle: false, keepBuffer: 1
+    });
+    f.layer.on("tileload", () => { f.ok++; });
+    f.layer.on("tileerror", () => { f.err++; if (S.idx === i) showFrame(i); });
+    f.layer.addTo(S.map);
+    return f;
+  });
+  const btn = $("#radarMode");
+  btn.textContent = S.mode === "clean" ? "Radar: filtered" : "Radar: raw";
+  btn.setAttribute("aria-pressed", String(S.mode === "clean"));
+  btn.title = S.mode === "clean" ? "Showing NOAA MRMS (birds, insects and ground clutter removed). Tap for raw NEXRAD." : "Showing raw NEXRAD (may include birds, insects, ground clutter). Tap for filtered.";
+  $("#scrub").max = S.frames.length - 1;
   S.lastRadar = Date.now();
-  radarTimes().then(() => showFrame(S.idx));
+  showFrame(S.frames.length - 1);
+  if (S.mode === "raw") radarTimes().then(() => showFrame(S.idx));
 }
 async function radarTimes(){
-  let base = null; S.approx = true;
+  let base = null, approx = true;
   try {
     const j = await getJSON("https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json", {}, 6000);
     const v = Date.parse(j.meta.valid);
-    if (Math.abs(Date.now() - v) < 20 * 60000){ base = v; S.approx = false; }
+    if (Math.abs(Date.now() - v) < 20 * 60000){ base = v; approx = false; }
   } catch(e){}
   if (!base) base = Math.floor(Date.now() / 300000) * 300000 - 300000; // estimate: latest full 5-minute mosaic
-  S.frameTimes = OFFSETS.map((o) => base - o * 60000);
+  S.frames.forEach((f) => { f.time = base - f.off * 60000; f.approx = approx; });
 }
 function showFrame(i){
   S.idx = i;
-  S.layers.forEach((l, k) => l.setOpacity(k === i ? 0.78 : 0));
+  S.frames.forEach((f, k) => f.layer.setOpacity(k === i ? 0.78 : 0));
   $("#scrub").value = i;
-  const t = S.frameTimes[i];
-  $("#frameTime").textContent = t ? (S.approx ? "≈ " : "") + fmtClock(t) : "--";
-  $("#frameAgo").textContent = i === OFFSETS.length - 1 ? "Latest" : `${OFFSETS[i]} min earlier`;
+  const f = S.frames[i]; if (!f) return;
+  const clock = f.time ? (f.approx ? "≈ " : "") + fmtClock(f.time) : "";
+  if (unavailable(f)){ $("#frameTime").textContent = clock || "--"; $("#frameAgo").textContent = "Not available"; return; }
+  if (f.latest){ $("#frameTime").textContent = clock || "Latest"; $("#frameAgo").textContent = clock ? "Latest" : (S.mode === "clean" ? "Filtered" : ""); return; }
+  $("#frameTime").textContent = clock || "--";
+  $("#frameAgo").textContent = f.time ? `${Math.max(1, Math.round((Date.now() - f.time) / 60000))} min ago` : "";
+}
+function nextFrame(i){
+  const n = S.frames.length;
+  for (let step = 1; step <= n; step++){ const j = (i + step) % n; if (!unavailable(S.frames[j])) return j; }
+  return i;
 }
 function setPlaying(on){
   S.playing = on;
@@ -374,10 +413,10 @@ function setPlaying(on){
     : '<path d="M8 5.5v13a1 1 0 0 0 1.5.9l10.2-6.5a1 1 0 0 0 0-1.7L9.5 4.6A1 1 0 0 0 8 5.5z"/>';
   if (on){
     S.timer = setInterval(() => {
-      const last = OFFSETS.length - 1;
+      const last = S.frames.length - 1;
       if (S.idx === last && S.hold < 3){ S.hold++; return; }
       S.hold = 0;
-      showFrame(S.idx === last ? 0 : S.idx + 1);
+      showFrame(nextFrame(S.idx));
     }, 450);
   }
 }
@@ -611,6 +650,7 @@ $("#refreshBtn").addEventListener("click", refreshAll);
 $("#q").addEventListener("input", (e) => { clearTimeout(searchTimer); searchTimer = setTimeout(() => runSearch(e.target.value), 300); });
 $("#searchForm").addEventListener("submit", (e) => { if (e.submitter && e.submitter.value === "close") return; e.preventDefault(); runSearch($("#q").value); });
 $("#playBtn").addEventListener("click", () => setPlaying(!S.playing));
+$("#radarMode").addEventListener("click", () => { S.mode = S.mode === "clean" ? "raw" : "clean"; store.set("nimbus.radarMode", S.mode); if (S.map) buildRadar(); });
 $("#scrub").addEventListener("input", (e) => { setPlaying(false); showFrame(+e.target.value); });
 
 document.addEventListener("visibilitychange", () => {
