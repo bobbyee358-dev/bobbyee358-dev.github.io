@@ -69,6 +69,8 @@ a{color:var(--accent)}
 .legend{width:150px;padding:6px 8px;border-radius:10px;background:color-mix(in srgb,var(--surface) 88%,transparent);
   border:1px solid var(--line);font-size:10px;color:var(--muted)}
 .legend .ramp{height:7px;border-radius:4px;background:linear-gradient(90deg,#04e9e7,#019ff4,#0300f4,#02fd02,#01c501,#008e00,#fdf802,#e5bc00,#fd9500,#fd0000,#bc0000,#f800fd,#9854c6)}
+/* filtered (MRMS) scale, matched to colors seen on the live map: lavender/blue = light rain */
+.legend.clean .ramp{background:linear-gradient(90deg,#b3a9f0,#7f86e6,#4f6fe0,#22b83a,#1a9a2a,#f0e030,#f2a020,#e2321e,#a51818)}
 .legend .scale{display:flex;justify-content:space-between;margin-top:3px}
 
 .radarbar{position:absolute;left:10px;right:10px;bottom:10px;z-index:600;display:flex;align-items:center;gap:10px;
@@ -174,9 +176,9 @@ dialog::backdrop{background:rgb(0 0 0 / .45)}
     <div id="map" role="application" aria-label="Radar map"></div>
     <div class="maplabel">
       <button type="button" class="chip modebtn" id="radarMode" aria-pressed="true">Radar: filtered</button>
-      <div class="legend" aria-label="Radar intensity scale">
+      <div class="legend" id="legend" aria-label="Radar intensity scale">
         <div class="ramp"></div>
-        <div class="scale"><span>Light</span><span>Heavy</span><span>Extreme</span></div>
+        <div class="scale" id="legendScale"><span>Light</span><span>Heavy</span><span>Extreme</span></div>
       </div>
     </div>
     <div class="radarbar">
@@ -373,6 +375,10 @@ function buildRadar(){
   btn.textContent = S.mode === "clean" ? "Radar: filtered" : "Radar: raw";
   btn.setAttribute("aria-pressed", String(S.mode === "clean"));
   btn.title = S.mode === "clean" ? "Showing NOAA MRMS (birds, insects and ground clutter removed). Tap for raw NEXRAD." : "Showing raw NEXRAD (may include birds, insects, ground clutter). Tap for filtered.";
+  $("#legend").classList.toggle("clean", S.mode === "clean");
+  $("#legendScale").innerHTML = S.mode === "clean"
+    ? "<span>Light</span><span>Moderate</span><span>Heavy</span>"
+    : "<span>Light</span><span>Heavy</span><span>Extreme</span>";
   $("#scrub").max = S.frames.length - 1;
   S.lastRadar = Date.now();
   showFrame(S.frames.length - 1);

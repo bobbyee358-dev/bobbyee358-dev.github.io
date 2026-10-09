@@ -1,7 +1,7 @@
 // Nimbus Radar service worker.
 // Keeps the app shell available so it opens instantly and installs as an app.
 // Weather data, radar tiles and map tiles always come from the network (never stored offline).
-const CACHE = "radar-v3";
+const CACHE = "radar-v4";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 const LIB_HOSTS = ["cdnjs.cloudflare.com", "unpkg.com"];
 
